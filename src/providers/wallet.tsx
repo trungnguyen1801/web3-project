@@ -190,9 +190,9 @@ const WalletProvider: React.FC<PropsWithChildren> = ({ children }) => {
       const address = await getWalletAddress();
       if(!address) return;
       setAddress(address);
-      switchNetworkBSC();
-      getBalanceBNB(address);
-      getBalanceUSDT(address);
+      await switchNetworkBSC();
+      await getBalanceBNB(address);
+      await getBalanceUSDT(address);
     } catch (error) {
       console.error(error)
     } finally {
