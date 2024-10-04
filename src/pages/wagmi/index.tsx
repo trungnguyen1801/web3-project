@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   useConnect,
   useChainId,
@@ -7,14 +7,14 @@ import {
   useBalance,
   useSendTransaction,
 } from "wagmi";
-import Image from "next/image";
 import LogoMetamask from "@/public/images/metamask.svg";
 import ConnectButton from "@/components/ConnectButton";
-import { formatAddress } from "@/services/helper";
 import type { Address } from "viem";
 import { parseEther } from "viem";
 import { ADDRESS_USDT_TOKEN } from "@/config/constant";
 import { toast } from "react-toastify";
+import Balance from "@/components/Balance";
+import Transfer from "@/components/Transfer";
 
 const DecentralizedApp = () => {
   const chainId = useChainId();
@@ -83,130 +83,58 @@ const DecentralizedApp = () => {
       )}
       <div className="mx-auto bg-[#232323] max-w-[400px] text-white px-5 py-8 rounded-[12px]">
         <h2 className="text-[20px] font-medium">Balance</h2>
-        <p className=" flex items-center gap-1 text-[#939393] text-[12px] mt-2">
-          <Image
-            src={LogoMetamask}
-            width={12}
-            height={12}
-            alt="Logo Metamask"
-          ></Image>
-          {formatAddress(address as Address)}
-        </p>
-        <div className="flex flex-col border-[#323232] rounded-[12px] border-[1px] p-3">
-          <span className="text-[12px] text-[#939393]">BNB </span>
-          <p className="text-[16px]text-[#939393]">{balanceBNB?.formatted}</p>
-        </div>
-        <p className=" flex items-center gap-1 text-[#939393] text-[12px] mt-2">
-          <Image
-            src={LogoMetamask}
-            width={12}
-            height={12}
-            alt="Logo Metamask"
-          ></Image>
-          {formatAddress(address as Address)}
-        </p>
-        <div className="flex flex-col border-[#323232] rounded-[12px] border-[1px] p-3">
-          <span className="text-[12px] text-[#939393]">USDT</span>
-          <p className="text-[16px]text-[#939393]">{balanceUSDT?.formatted}</p>
-        </div>
-        <h2 className="text-[20px] font-medium mt-3">Transfer BNB</h2>
-        <div className="flex flex-col border-[#323232] rounded-[12px] border-[1px] p-3 mt-3">
-          <label
-            className="text-[12px] text-[#939393]"
-            htmlFor="recipient-address-bnb"
-          >
-            Recipient Address BNB
-          </label>
-          <input
-            className="bg-transparent outline-none border-none placeholder:text-[16px] placeholder:text-[#939393]"
-            placeholder="0x00.."
-            id="recipient-address-bnb"
-            value={recipientAddressBNB}
-            onInput={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setRecipientAddressBNB(e.target.value)
-            }
-          ></input>
-        </div>
-        <div className="flex flex-col border-[#323232] rounded-[12px] border-[1px] p-3 mt-3">
-          <label className="text-[12px] text-[#939393]" htmlFor="amount-bnb">
-            Amount BNB
-          </label>
-          <input
-            className="bg-transparent outline-none border-none placeholder:text-[16px] placeholder:text-[#939393]"
-            placeholder="0"
-            id="amount-bnb"
-            type="number"
-            value={amountInBNB}
-            onInput={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setAmountInBNB(e.target.value)
-            }
-          ></input>
-        </div>
-        <button
-          className="bg-white w-full p-4 rounded-[12px] text-black text-[16px] mt-3 hover:bg-[#999999] disabled:bg-[#999999] transition-all"
-          onClick={() =>
+        <Balance
+          logo={LogoMetamask}
+          altLogo={"Logo MetaMask"}
+          token="BNB"
+          address={address}
+          balance={balanceBNB?.formatted}
+        />
+        <Balance
+          logo={LogoMetamask}
+          altLogo={"Logo MetaMask"}
+          token="USDT"
+          address={address}
+          balance={balanceUSDT?.formatted}
+        />
+        <Transfer
+          token="BNB"
+          toAddress={recipientAddressBNB}
+          amount={amountInBNB}
+          onInputAddress={(address) => setRecipientAddressBNB(address)}
+          onInputAmount={(amount) => setAmountInBNB(amount)}
+          transfer={() =>
             transferBNB({
               to: recipientAddressBNB as Address,
               value: parseEther(amountInBNB),
             })
           }
-          disabled={
+          disabledTransfer={
             Number(amountInBNB) > Number(balanceBNB) ||
             !recipientAddressBNB ||
             !amountInBNB
           }
-        >
-          {isPendingBNB ? <span className="loader"></span> : "Transfer BNB"}
-        </button>
-        <h2 className="text-[20px] font-medium mt-3">Transfer USDT</h2>
-        <div className="flex flex-col border-[#323232] rounded-[12px] border-[1px] p-3 mt-3">
-          <label
-            className="text-[12px] text-[#939393]"
-            htmlFor="recipient-address-usdt"
-          >
-            Recipient Address USDT
-          </label>
-          <input
-            className="bg-transparent outline-none border-none placeholder:text-[16px] placeholder:text-[#939393]"
-            id="recipient-address-usdt"
-            placeholder="0x00.."
-            value={recipientAddressUSDT}
-            onInput={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setRecipientAddressUSDT(e.target.value)
-            }
-          ></input>
-        </div>
-        <div className="flex flex-col border-[#323232] rounded-[12px] border-[1px] p-3 mt-3">
-          <label className="text-[12px] text-[#939393]" htmlFor="amount-usdt">
-            Amount USDT
-          </label>
-          <input
-            id="amount-usdt"
-            className="bg-transparent outline-none border-none placeholder:text-[16px] placeholder:text-[#939393]"
-            type="number"
-            placeholder="0"
-            value={amountInUSDT}
-            onInput={(e: React.ChangeEvent<HTMLInputElement>) =>
-              setAmountInUSDT(e.target.value)
-            }
-          ></input>
-        </div>
-        <button
-          className="bg-white w-full p-4 rounded-[12px] text-black text-[16px] mt-3 hover:bg-[#999999] disabled:bg-[#999999] transition-all"
-          onClick={() =>
+          loading={isPendingBNB}
+        />
+        <Transfer
+          token="USDT"
+          toAddress={recipientAddressUSDT}
+          amount={amountInUSDT}
+          onInputAddress={(address) => setRecipientAddressUSDT(address)}
+          onInputAmount={(amount) => setAmountInUSDT(amount)}
+          transfer={() =>
             transferUSDT({
               to: recipientAddressUSDT as Address,
               value: parseEther(amountInUSDT),
             })
           }
-          disabled={
+          disabledTransfer={
             Number(amountInUSDT) > Number(balanceUSDT) ||
             !recipientAddressUSDT ||
             !amountInUSDT
           }
-        >
-          {isPendingUSDT ? <span className="loader"></span> : "Transfer USDT"}
-        </button>
+          loading={isPendingUSDT}
+        />
       </div>
     </>
   );
