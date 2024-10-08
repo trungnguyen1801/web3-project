@@ -6,3 +6,4 @@ export const ERC20_ABI = [
   "function balanceOf(address owner) view returns (uint256)",
   "function decimals() view returns (uint8)",
 ];
+export const BSC_CHAIN_ID = 97;

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
+    "decimal.js": "^10.4.3",
     "ethers": "^6.13.2",
     "next": "14.2.14",
     "react": "^18",

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   useConnect,
   useChainId,
@@ -6,57 +6,63 @@ import {
   useDisconnect,
   useBalance,
   useSendTransaction,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+  usePublicClient,
 } from "wagmi";
 import LogoMetamask from "@/public/images/metamask.svg";
 import ConnectButton from "@/components/ConnectButton";
 import type { Address } from "viem";
-import { parseEther } from "viem";
-import { ADDRESS_USDT_TOKEN } from "@/config/constant";
+import { formatEther, parseEther } from "viem";
+import {
+  ADDRESS_USDT_TOKEN,
+  BSC_CHAIN_ID,
+} from "@/config/constant";
+import { erc20Abi } from "viem";
 import { toast } from "react-toastify";
 import Balance from "@/components/Balance";
 import Transfer from "@/components/Transfer";
 
+type Balance = {
+  decimals: number;
+  formatted: string;
+  symbol: string;
+  value: bigint;
+};
+
 const DecentralizedApp = () => {
   const chainId = useChainId();
-  const { isConnected, address, isConnecting } = useAccount();
+  const publicClient = usePublicClient();
+  const {
+    isConnected,
+    address: account,
+    isConnecting,
+    chainId: chainIdAccount,
+  } = useAccount();
   const { connectors, connect } = useConnect();
   const { disconnect } = useDisconnect();
-  const { data: balanceBNB } = useBalance({ address });
+  const { data: balanceBNB } = useBalance({ address: account });
   const { data: balanceUSDT } = useBalance({
-    address,
+    address: account,
     token: ADDRESS_USDT_TOKEN,
   });
   const {
+    data: hashBNB,
     sendTransaction: transferBNB,
-    isPending: isPendingBNB,
-  } = useSendTransaction({
-    mutation: {
-      onSuccess() {
-        toast.success("Success!");
-        setRecipientAddressBNB("");
-        setAmountInBNB("");
-      },
-      onError(error) {
-        console.error(error);
-        toast.error("Error!");
-      },
-    },
-  });
+    error,
+  } = useSendTransaction();
   const {
-    sendTransaction: transferUSDT,
-    isPending: isPendingUSDT,
-  } = useSendTransaction({
-    mutation: {
-      onSuccess() {
-        toast.success("Success!");
-        setRecipientAddressUSDT("");
-        setAmountInUSDT("");
-      },
-      onError(error) {
-        console.error(error);
-        toast.error("Error!");
-      },
-    },
+    isLoading: isPendingBNB,
+    isSuccess: isSuccessBNB,
+  } = useWaitForTransactionReceipt({
+    hash: hashBNB,
+  });
+  const { data: hashUSDT, writeContract } = useWriteContract();
+  const {
+    isLoading: isPendingUSDT,
+    isSuccess: isSuccessUSDT,
+  } = useWaitForTransactionReceipt({
+    hash: hashUSDT,
   });
 
   const [amountInBNB, setAmountInBNB] = useState<string>("");
@@ -64,11 +70,95 @@ const DecentralizedApp = () => {
   const [amountInUSDT, setAmountInUSDT] = useState<string>("");
   const [recipientAddressUSDT, setRecipientAddressUSDT] = useState<string>("");
 
+  useEffect(() => {
+    if (chainIdAccount !== BSC_CHAIN_ID) disconnect();
+  }, [chainIdAccount]);
+
+  useEffect(() => {
+    if (isSuccessBNB) {
+      toast.success("Success!");
+      setRecipientAddressBNB("");
+      setAmountInBNB("");
+    } else if (isSuccessUSDT) {
+      toast.success("Success!");
+      setRecipientAddressUSDT("");
+      setAmountInUSDT("");
+    } else if (error) {
+      toast.error(error as any);
+    }
+  }, [isSuccessBNB, isSuccessUSDT]);
+
+  const handleTransferBNB = async () => {
+    if (!publicClient) return;
+    try {
+      const gasEstimate = await publicClient.estimateGas({
+        account: account as Address,
+        to: recipientAddressBNB as Address,
+        value: parseEther(amountInBNB),
+      });
+      const gasPrice = await publicClient.getGasPrice();
+      if (!gasEstimate || !balanceBNB) return;
+      const gasFee = gasEstimate * gasPrice;
+      const gasFeeInEth = formatEther(gasFee);
+      if (
+        parseFloat(formatEther(balanceBNB.value)) <
+        parseFloat(amountInBNB) + parseFloat(gasFeeInEth)
+      ) {
+        toast.error("Not enough balance");
+        return;
+      }
+    } catch (error) {
+      toast.error("Not enough balance");
+    }
+
+    try {
+      await transferBNB({
+        to: recipientAddressBNB as Address,
+        value: parseEther(amountInBNB),
+      });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const transferUSDT = async () => {
+    if (!publicClient) return;
+    try {
+      const gasEstimate = await publicClient.estimateContractGas({
+        address: ADDRESS_USDT_TOKEN,
+        abi: erc20Abi,
+        functionName: "transfer",
+        args: [recipientAddressUSDT as Address, parseEther(amountInUSDT)],
+        account: account,
+      });
+      const gasPrice = await publicClient.getGasPrice();
+      if (!gasEstimate || !balanceUSDT || !balanceBNB) return;
+      const gasFee = gasEstimate * gasPrice;
+      const gasFeeInEth = formatEther(gasFee);
+      if (
+        parseFloat(formatEther(balanceBNB.value)) < parseFloat(gasFeeInEth) ||
+        parseFloat(formatEther(balanceUSDT.value)) < parseFloat(amountInUSDT)
+      ) {
+        toast.error("Not enough balance");
+        return;
+      }
+    } catch (error) {
+      toast.error("Not enough balance");
+    }
+
+    await writeContract({
+      abi: erc20Abi,
+      address: ADDRESS_USDT_TOKEN,
+      functionName: "transfer",
+      args: [recipientAddressUSDT as Address, parseEther(amountInUSDT)],
+    });
+  };
+
   return (
     <>
       {connectors.map(
         (connector) =>
-          connector.type === "metaMask" && (
+          connector.id === "io.metamask" && (
             <ConnectButton
               key={connector.uid}
               connector={connector}
@@ -87,14 +177,14 @@ const DecentralizedApp = () => {
           logo={LogoMetamask}
           altLogo={"Logo MetaMask"}
           token="BNB"
-          address={address}
+          address={account}
           balance={balanceBNB?.formatted}
         />
         <Balance
           logo={LogoMetamask}
           altLogo={"Logo MetaMask"}
           token="USDT"
-          address={address}
+          address={account}
           balance={balanceUSDT?.formatted}
         />
         <Transfer
@@ -103,17 +193,8 @@ const DecentralizedApp = () => {
           amount={amountInBNB}
           onInputAddress={(address) => setRecipientAddressBNB(address)}
           onInputAmount={(amount) => setAmountInBNB(amount)}
-          transfer={() =>
-            transferBNB({
-              to: recipientAddressBNB as Address,
-              value: parseEther(amountInBNB),
-            })
-          }
-          disabledTransfer={
-            Number(amountInBNB) > Number(balanceBNB) ||
-            !recipientAddressBNB ||
-            !amountInBNB
-          }
+          transfer={handleTransferBNB}
+          disabledTransfer={!recipientAddressBNB || !amountInBNB}
           loading={isPendingBNB}
         />
         <Transfer
@@ -122,17 +203,8 @@ const DecentralizedApp = () => {
           amount={amountInUSDT}
           onInputAddress={(address) => setRecipientAddressUSDT(address)}
           onInputAmount={(amount) => setAmountInUSDT(amount)}
-          transfer={() =>
-            transferUSDT({
-              to: recipientAddressUSDT as Address,
-              value: parseEther(amountInUSDT),
-            })
-          }
-          disabledTransfer={
-            Number(amountInUSDT) > Number(balanceUSDT) ||
-            !recipientAddressUSDT ||
-            !amountInUSDT
-          }
+          transfer={transferUSDT}
+          disabledTransfer={!recipientAddressUSDT || !amountInUSDT}
           loading={isPendingUSDT}
         />
       </div>
