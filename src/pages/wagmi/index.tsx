@@ -109,6 +109,7 @@ const DecentralizedApp = () => {
       }
     } catch (error) {
       toast.error("Not enough balance");
+      return;
     }
 
     try {
@@ -144,6 +145,7 @@ const DecentralizedApp = () => {
       }
     } catch (error) {
       toast.error("Not enough balance");
+      return;
     }
 
     await writeContract({
