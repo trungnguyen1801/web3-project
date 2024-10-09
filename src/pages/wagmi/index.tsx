@@ -13,15 +13,23 @@ import {
 import LogoMetamask from "@/public/images/metamask.svg";
 import ConnectButton from "@/components/ConnectButton";
 import type { Address } from "viem";
-import { formatEther, parseEther } from "viem";
+import { formatEther, formatUnits, parseEther } from "viem";
 import {
   ADDRESS_USDT_TOKEN,
   BSC_CHAIN_ID,
+  GWEI_DECIMAL,
+  BSC_DECIMAL,
 } from "@/config/constant";
 import { erc20Abi } from "viem";
 import { toast } from "react-toastify";
 import Balance from "@/components/Balance";
 import Transfer from "@/components/Transfer";
+import { estimateFeesPerGas, getBlock, prepareTransactionRequest } from "wagmi/actions";
+import { config } from "@/providers/wagmi";
+import Decimal from "decimal.js";
+import { type } from "os";
+import { parseGwei } from "viem";
+import { ethers } from "ethers"
 
 type Balance = {
   decimals: number;
@@ -98,13 +106,14 @@ const DecentralizedApp = () => {
       });
       const gasPrice = await publicClient.getGasPrice();
       if (!gasEstimate || !balanceBNB) return;
-      const gasFee = gasEstimate * gasPrice;
-      const gasFeeInEth = formatEther(gasFee);
-      if (
-        parseFloat(formatEther(balanceBNB.value)) <
-        parseFloat(amountInBNB) + parseFloat(gasFeeInEth)
-      ) {
-        toast.error("Not enough balance");
+      const _gasEstimate = new Decimal(formatUnits(gasEstimate, GWEI_DECIMAL));
+      const _gasPrice = new Decimal(formatUnits(gasPrice, GWEI_DECIMAL));
+      const _amountInBNB = new Decimal(
+        formatUnits(parseEther(amountInBNB), BSC_DECIMAL)
+      );
+      const _balance = new Decimal(formatUnits(balanceBNB.value, BSC_DECIMAL));
+      if (_amountInBNB.add(_gasEstimate.mul(_gasPrice)).greaterThan(_balance)) {
+        toast.error("Not enough gas");
         return;
       }
     } catch (error) {
@@ -134,11 +143,24 @@ const DecentralizedApp = () => {
       });
       const gasPrice = await publicClient.getGasPrice();
       if (!gasEstimate || !balanceUSDT || !balanceBNB) return;
-      const gasFee = gasEstimate * gasPrice;
-      const gasFeeInEth = formatEther(gasFee);
+      const _gasEstimate = new Decimal(formatUnits(gasEstimate, GWEI_DECIMAL));
+      const _gasPrice = new Decimal(formatUnits(gasPrice, GWEI_DECIMAL));
+      const _amountInUSDT = new Decimal(
+        formatUnits(parseEther(amountInUSDT), BSC_DECIMAL)
+      );
+      const _balanceUSDT = new Decimal(
+        formatUnits(balanceUSDT.value, BSC_DECIMAL)
+      );
+      const _balanceBNB = new Decimal(
+        formatUnits(balanceBNB.value, BSC_DECIMAL)
+      );
       if (
-        parseFloat(formatEther(balanceBNB.value)) < parseFloat(gasFeeInEth) ||
-        parseFloat(formatEther(balanceUSDT.value)) < parseFloat(amountInUSDT)
+        _gasEstimate.mul(_gasPrice).greaterThan(_balanceBNB)
+      ) {
+        toast.error("Not enough gas");
+        return;
+      } else if (
+        _amountInUSDT.greaterThan(_balanceUSDT)
       ) {
         toast.error("Not enough balance");
         return;

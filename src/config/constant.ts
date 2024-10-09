@@ -7,3 +7,5 @@ export const ERC20_ABI = [
   "function decimals() view returns (uint8)",
 ];
 export const BSC_CHAIN_ID = 97;
+export const BSC_DECIMAL = 18;
+export const GWEI_DECIMAL = 9;
